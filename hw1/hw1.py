@@ -16,4 +16,16 @@ def get_corners(xy, theta, corner1, corner2, corner3, corner4):
         A tuple of four NumPy arrays, each with shape (2, 1).
     """
     # TODO: implement the rotation and translation for each corner.
-    raise NotImplementedError("Implement get_corners before running the checks.")
+
+    R = np.array([
+        [np.cos(theta), -np.sin(theta)],
+        [np.sin(theta),  np.cos(theta)]
+    ]) # rotation matrix
+
+    new_corner1 = R @ corner1 + xy
+    new_corner2 = R @ corner2 + xy
+    new_corner3 = R @ corner3 + xy
+    new_corner4 = R @ corner4 + xy
+    
+    print([new_corner1, new_corner2, new_corner3, new_corner4])
+    return new_corner1, new_corner2, new_corner3, new_corner4
