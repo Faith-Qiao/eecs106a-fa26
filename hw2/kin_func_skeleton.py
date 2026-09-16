@@ -18,6 +18,7 @@ code by running "python kin_func_skeleton.py" at the command line.
 import numpy as np
 import scipy.linalg as spl
 from scipy.spatial.transform import Rotation
+import math
 
 np.set_printoptions(precision=4, suppress=True)
 
@@ -117,6 +118,16 @@ def R3_to_so3(omega):
     """
 
     # YOUR CODE HERE
+    empty = np.zeros((3,3))
+    empty[0][1] = -omega[2]
+    empty[0][2] = omega[1]
+    empty[1][2] = -omega[0]
+
+
+    empty[1][0] = omega[2]
+    empty[2][0] = -omega[1]
+    empty[2][1] = omega[0]
+    return empty
 
 
 def so3_to_R3(omega_hat):
@@ -133,7 +144,12 @@ def so3_to_R3(omega_hat):
     # Check that the input is skew-symmetric.
     assert np.allclose(omega_hat, -omega_hat.T)
 
-    # YOUR CODE HERE
+    omega = np.array([0.0,0.0,0.0])
+    omega[0] = omega_hat[2][1]
+    omega[1] = omega_hat[0][2]
+    omega[2] = omega_hat[1][0]
+    return omega
+
 
 
 def axis_angle_to_SO3(omega, theta):
@@ -150,9 +166,17 @@ def axis_angle_to_SO3(omega, theta):
     Note! Axes are always unit vectors (though you may need to unitify the input omega)
 
     """
+    norm = np.linalg.norm(omega)
+    if norm < 1e-8:
+        return np.eye(3)
+    u = omega/norm
+    theta = theta*norm
+    sin = math.sin(theta)
+    cos = math.cos(theta)
+    u_hat = R3_to_so3(u)
 
-    # YOUR CODE HERE
-
+    I = np.eye(3)
+    return I + sin*u_hat + (1-cos) * (u_hat @ u_hat)
 
 def so3_to_SO3(omega_hat, theta=1):
     """
@@ -170,6 +194,8 @@ def so3_to_SO3(omega_hat, theta=1):
     """
 
     # YOUR CODE HERE
+    omega = so3_to_R3(omega_hat)
+    return axis_angle_to_SO3(omega, theta)
 
 
 def twist_to_se3(xi, theta=1):
@@ -185,10 +211,10 @@ def twist_to_se3(xi, theta=1):
 
     Note: xi need not be a unit twist! (ie it may have some displacement information embedded into it)
     """
-
-    # YOUR CODE HERE
-
-
+    xi_hat = np.zeros((4,4))
+    xi_hat[:3, :3] = R3_to_so3(xi[3:])
+    xi_hat[:3, 3] = xi[:3]
+    return xi_hat * theta 
 
 def se3_to_twist(xi_hat):
     """
@@ -200,8 +226,9 @@ def se3_to_twist(xi_hat):
     Returns:
     xi - (6,) ndarray: the 3D twist
     """
-
-    # YOUR CODE HERE
+    v = xi_hat[:3, 3]
+    omega = so3_to_R3(xi_hat[:3, :3])
+    return np.concatenate((v, omega))
 
 
 def twist_to_SE3(xi, theta=1):
@@ -218,8 +245,20 @@ def twist_to_SE3(xi, theta=1):
     Note: xi need not be a unit twist! (ie it may have some displacement information embedded into it)
 
     """
+    v = xi[:3]
+    omega = xi[3:]
+    norm = np.linalg.norm(omega)
 
-    # YOUR CODE HERE
+    if norm < 1e-8:
+        return pR_to_g(v * theta, np.eye(3))
+
+    u = omega / norm
+    v = v / norm
+    theta = theta * norm
+
+    R = axis_angle_to_SO3(u, theta)
+    p = (np.eye(3) - R) @ np.cross(u, v) + np.outer(u, u) @ v * theta
+    return pR_to_g(p, R)
 
 
 def se3_to_SE3(xi_hat, theta=1):
@@ -236,8 +275,7 @@ def se3_to_SE3(xi_hat, theta=1):
     Note: xi_hat need not correspond to a unit twist! (ie it may have some displacement information embedded into it)
 
     """
-
-    # YOUR CODE HERE
+    return twist_to_SE3(se3_to_twist(xi_hat), theta)
 
 
 def forward_kinematics(xi, theta):
@@ -252,8 +290,10 @@ def forward_kinematics(xi, theta):
     Returns:
     g - (4,4) ndarray: the resulting homogeneous transformation matrix
     """
-
-    # YOUR CODE HERE
+    g = np.eye(4)
+    for i in range(xi.shape[1]):
+        g = g @ twist_to_SE3(xi[:, i], theta[i])
+    return g
 
 
 # ------------------------- Other Helper Functions -----------------------------
