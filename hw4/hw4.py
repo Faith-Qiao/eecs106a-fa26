@@ -78,8 +78,8 @@ def ur7e_fk(q):
         end-effector pose in the robot base frame.
     """
 
-    # TODO: Use your HW2 forward-kinematics function for the UR7e.
-    return ...
+    g = forward_kinematics(UR7E_TWISTS, q)
+    return g @ UR7E_ZERO_POSE
 
 
 def verify_ik_solutions(desired_end_effector_pose, candidates):
@@ -108,11 +108,13 @@ def verify_ik_solutions(desired_end_effector_pose, candidates):
     """
     verified = []
 
-    # TODO: Check each candidate with forward kinematics and append valid rows.
-    ...
+    for c in candidates:
+        a_pose = ur7e_fk(c)
+        pos_error, o_error = pose_error( a_pose, desired_end_effector_pose)
+        if pos_error <= POSITION_TOLERANCE and o_error <= ORIENTATION_TOLERANCE:
+            verified.append(c)
 
     return np.array(verified)
-
 
 def closest_solutions_by_norm(solutions, q_current):
     """Find the closest IK solution using three common vector norms.
@@ -137,11 +139,17 @@ def closest_solutions_by_norm(solutions, q_current):
         ``(closest_l1, closest_l2, closest_linf)``, where each item is one row
         from ``solutions`` with shape ``(6,)``.
     """
-    # TODO: Compute the joint motions and select one row for each norm.
-    ...
+    motion = solutions - q_current
 
-    return closest_l1, closest_l2, closest_linf
+    l1 = np.linalg.norm(motion, ord=1, axis=1)
+    l2 = np.linalg.norm(motion, ord=2, axis=1)
+    linf = np.linalg.norm(motion, ord=np.inf, axis=1)
 
+    cl1 = solutions[np.argmin(l1)]
+    cl2 = solutions[np.argmin(l2)]
+    cl3 = solutions[np.argmin(linf)]
+
+    return cl1, cl2, cl3
 
 def select_solutions_by_objective(solutions, q_current):
     """Select valid IK solutions using two secondary objectives.
@@ -163,11 +171,19 @@ def select_solutions_by_objective(solutions, q_current):
     """
     valid = []
 
-    # TODO: Keep solutions within the joint limits and select both objectives.
-    ...
+    for sol in solutions:
+        if np.all(sol >= -2 * np.pi) and np.all(sol <= 2 * np.pi):
+            valid.append(sol)
 
-    return closest_current, closest_zero, np.array(valid)
+    valid = np.array(valid)
+    motion = valid - q_current
+    curr_dist= np.linalg.norm(motion, ord=2, axis=1)
+    cc = valid[np.argmin(curr_dist)]
 
+    zd = np.linalg.norm(valid, ord=np.inf, axis=1)
+    cz = valid[np.argmin(zd)]
+
+    return cc, cz, valid
 
 def solve_ur7e_pose(desired_end_effector_pose, q_current):
     """Run the complete EAIK inverse-kinematics pipeline.
@@ -187,6 +203,7 @@ def solve_ur7e_pose(desired_end_effector_pose, q_current):
         have shape ``(6,)`` and ``valid`` has shape ``(M, 6)``.
     """
     # TODO: Generate, verify, and select using both secondary objectives.
-    ...
-
-    return closest_current, closest_zero, valid
+    cand = robot.IK(desired_end_effector_pose).Q
+    verified = verify_ik_solutions(desired_end_effector_pose,cand)
+    cc, cz, valid = select_solutions_by_objective(verified, q_current)
+    return cc, cz, valid
