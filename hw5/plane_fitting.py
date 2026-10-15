@@ -18,8 +18,10 @@ def fit_plane_ls(points):
     if points.ndim != 2 or points.shape[1] != 3 or len(points) < 3 or not np.isfinite(points).all():
         raise ValueError('Expected at least three finite XYZ points.')
     # TODO 1: Compute the centroid and subtract it from every point.
-    raise NotImplementedError("TODO 1: center the points")
+    # raise NotImplementedError("TODO 1: center the points")
     # Provided SVD and degeneracy check. No SVD implementation is required.
+    centroid = np.mean(points, axis=0)
+    centered = points - centroid
     _, singular_values, vt = np.linalg.svd(centered, full_matrices=False)
     if singular_values[1] <= max(singular_values[0] * 1e-10, 1e-12):
         raise ValueError('Points are collinear or coincident.')
@@ -47,8 +49,7 @@ def plane_distances(points, normal, offset):
     normal, offset = normalize_plane(normal, offset)
     points = np.asarray(points, dtype=np.float64)
     # TODO 2: Return one perpendicular distance per point.
-    raise NotImplementedError("TODO 2: point-to-plane distances")
-
+    return np.abs(points @ normal + offset)
 
 def fit_plane_ransac(points, threshold=0.010, iterations=500, seed=106):
     """Call pyransac3d, refit its inliers once, and recompute the mask.
@@ -84,7 +85,13 @@ def fit_plane_ransac(points, threshold=0.010, iterations=500, seed=106):
         # TODO 3a: Create pyransac3d.Plane and call its fit method.
         # Use points, thresh=threshold, maxIteration=iterations.
         # Unpack the returned plane equation and inlier indices.
-        raise NotImplementedError("TODO 3a: call the RANSAC package")
+        plane = pyransac3d.Plane()
+        equation, indices = plane.fit(
+            points,
+            thresh=threshold,
+            maxIteration=iterations
+        )
+        
     finally:
         random.setstate(previous_state)
     indices = np.asarray(indices, dtype=int)
@@ -92,5 +99,7 @@ def fit_plane_ransac(points, threshold=0.010, iterations=500, seed=106):
         raise ValueError('RANSAC found fewer than three inliers.')
     # TODO 3b: Fit least squares to points at the returned indices.
     # Recompute the boolean mask over ALL input points using the refined fit.
-    raise NotImplementedError("TODO 3b: refine the consensus set")
+    normal, offset = fit_plane_ls(points[indices])
+    distances = plane_distances(points, normal, offset)
+    mask = distances <= threshold
     return normal, offset, mask, indices
